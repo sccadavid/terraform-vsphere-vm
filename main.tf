@@ -1,22 +1,44 @@
-provider "vsphere" {
-  allow_unverified_ssl = true
+variable "datacenter_name" {}
+variable "cluster_name" {}
+variable "datastore_name" {}
+variable "network_name" {}
+variable "virtual_machine_name" {}
+
+data "vsphere_datacenter" "dc" {
+  name = var.datacenter_name
 }
 
-locals {
-  datacenter_name      = "Datacenter"
-  cluster_name         = "East"
-  datastore_name       = "<DATASTORE_NAME>"
-  network_name         = "VM Network"
-  virtual_machine_name = "<VM_NAME>"
+data "vsphere_compute_cluster" "cluster" {
+  name          = var.cluster_name
+  datacenter_id = data.vsphere_datacenter.dc.id
 }
 
-module "vm" {
-  source  = "TFE_HOSTNAME/YOUR_ORG_NAME/vm/vsphere"
-  version = "0.0.1"
+data "vsphere_datastore" "datastore" {
+  name          = var.datastore_name
+  datacenter_id = data.vsphere_datacenter.dc.id
+}
 
-  datacenter_name      = local.datacenter_name
-  cluster_name         = local.cluster_name
-  datastore_name       = local.datastore_name
-  network_name         = local.network_name
-  virtual_machine_name = local.virtual_machine_name
+data "vsphere_network" "network" {
+  name          = var.network_name
+  datacenter_id = data.vsphere_datacenter.dc.id
+}
+
+resource "vsphere_virtual_machine" "vm" {
+  name             = var.virtual_machine_name
+  resource_pool_id = data.vsphere_compute_cluster.cluster.resource_pool_id
+  datastore_id     = data.vsphere_datastore.datastore.id
+  num_cpus         = 2
+  memory           = 1024
+  guest_id         = "other3xLinux64Guest"
+
+  network_interface {
+    network_id = data.vsphere_network.network.id
+  }
+
+  wait_for_guest_net_timeout = 0
+
+  disk {
+    label = "disk0"
+    size  = 20
+  }
 }
